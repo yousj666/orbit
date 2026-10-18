@@ -50,9 +50,15 @@ async function main() {
         try {
           const qrLibPath = join(__dirname, '..', 'assets', 'qrcode.min.js');
           const qrLib = readFileSync(qrLibPath, 'utf8');
-          // The lib is a UMD bundle; evaluate it to get the qrcode factory.
-          const factory = new Function(`${qrLib}; return qrcode;`)();
-          const qr = factory(0, 'M');
+          // The lib is UMD: give it a fake CommonJS env to grab the export.
+          const { createContext, runInContext } = await import('node:vm');
+          const moduleObj = { exports: {} as any };
+          const sandbox = { module: moduleObj, exports: moduleObj.exports };
+          createContext(sandbox);
+          runInContext(qrLib, sandbox);
+          const qrcodeFn = (moduleObj.exports ?? (sandbox as any).qrcode) as any;
+          if (typeof qrcodeFn !== 'function') throw new Error('qrcode lib did not export');
+          const qr = qrcodeFn(0, 'M');
           qr.addData(link);
           qr.make();
           const svg = qr.createSvgTag({ scalable: true });
