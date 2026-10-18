@@ -46,9 +46,17 @@ async function main() {
         qrcode.generate(link, { small: true });
         console.log(`\n用手机 App 扫描上面的二维码配对（5 分钟内有效）`);
         // Write a scannable QR web page (terminal QR is often unscannable).
+        // Render the QR server-side as static SVG: zero JS, always displays.
         try {
-          const qrLib = readFileSync(join(__dirname, '..', 'assets', 'qrcode.min.js'), 'utf8');
-          const html = `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Orbit 配对</title><style>body{font-family:system-ui;background:#F7F6F4;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0}#qr{background:#fff;padding:24px;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.08)}p{color:#666;max-width:320px;text-align:center}</style></head><body><h2>用 Orbit App 扫码配对</h2><div id="qr"></div><p>5 分钟内有效。电脑和手机需在同一 WiFi。</p><script>${qrLib}</script><script>var qr=qrcode(0,'M');qr.addData(${JSON.stringify(link)});qr.make();document.getElementById('qr').innerHTML=qr.createSvgTag({scalable:true});</script></body></html>`;
+          const qrLibPath = join(__dirname, '..', 'assets', 'qrcode.min.js');
+          const qrLib = readFileSync(qrLibPath, 'utf8');
+          // The lib is a UMD bundle; evaluate it to get the qrcode factory.
+          const factory = new Function(`${qrLib}; return qrcode;`)();
+          const qr = factory(0, 'M');
+          qr.addData(link);
+          qr.make();
+          const svg = qr.createSvgTag({ scalable: true });
+          const html = `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Orbit 配对</title><style>body{font-family:system-ui;background:#F7F6F4;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0}#qr{background:#fff;padding:24px;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.08)}#qr svg{width:min(70vw,320px);height:auto;display:block}p{color:#666;max-width:320px;text-align:center}</style></head><body><h2>用 Orbit App 扫码配对</h2><div id="qr">${svg}</div><p>5 分钟内有效。电脑和手机需在同一 WiFi。</p></body></html>`;
           const htmlPath = join(homedir(), '.opa', 'pair.html');
           writeFileSync(htmlPath, html);
           console.log(`浏览器打开此文件扫码（二维码更清晰）：\n${htmlPath}`);
