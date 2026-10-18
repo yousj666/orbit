@@ -2,6 +2,7 @@
 import { Db } from './store/db.ts';
 import { EventLog } from './store/events.ts';
 import { CodexBridge } from './codex/bridge.ts';
+import { OpenAIRpc } from './codex/openai-rpc.ts';
 import { Gateway } from './gateway/gateway.ts';
 import { Identity } from './gateway/identity.ts';
 import { Butler } from './butler/butler.ts';
@@ -40,7 +41,9 @@ export class Host {
     this.ev = new EventLog(this.db);
     this.id = new Identity(this.db);
     this.cfg = loadConfig(this.db);
-    this.bridge = parts.bridge ?? new CodexBridge();
+    this.bridge = parts.bridge ?? new CodexBridge(
+      process.env.OPA_OPENAI_API_KEY ? new OpenAIRpc() : undefined,
+    );
     this.gw = new Gateway(this.id, this.db, this.ev, this.cfg);
     this.butler = new Butler(this.db, this.ev, this.bridge, this.gw);
   }

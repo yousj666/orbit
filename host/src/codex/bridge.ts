@@ -115,7 +115,7 @@ const isRecord = (v: unknown): v is { [key: string]: JsonValue } => Boolean(v) &
  *  | 'plan' {plan} | 'goal' {goal}
  */
 export class CodexBridge extends EventEmitter {
-  readonly rpc: CodexRpc;
+  readonly rpc: CodexRpc | import('./openai-rpc.ts').OpenAIRpc;
   readonly sessions = new Map<string, LiveSession>();
   approvalHandler: ApprovalHandler = async () => ({ approve: false });
   audit: (actor: string, action: string, detail: unknown) => void = () => {};
@@ -130,7 +130,7 @@ export class CodexBridge extends EventEmitter {
   private mcpNamesCache?: { names: string[]; at: number };
   private mcpOverrideBroken = false;
 
-  constructor(rpc = new CodexRpc()) {
+  constructor(rpc: CodexRpc | import('./openai-rpc.ts').OpenAIRpc = new CodexRpc()) {
     super();
     this.rpc = rpc;
     rpc.on('notification', (m: string, p: any) => this.onNotification(m, p));
