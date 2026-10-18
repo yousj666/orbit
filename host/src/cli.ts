@@ -25,9 +25,32 @@ async function main() {
     case 'start': {
       const { Host } = await import('./app.ts');
       const { startControl } = await import('./control.ts');
+      const { Identity } = await import('./gateway/identity.ts');
       const host = new Host();
       await host.start();
       startControl(host);
+      // Inline pairing QR: the control socket is unavailable on some
+      // Windows setups, so show the pairing code right here too.
+      try {
+        const { token, exp } = host.id.newPairToken();
+        const payload = {
+          v: 1, hostId: host.id.hostId, hostPub: host.id.pubB64, hostName: host.id.hostName,
+          lan: Identity.lanAddrs(host.cfg.port), relay: host.cfg.relayUrl ?? null, pairToken: token, exp,
+        };
+        const link = `opa://pair?d=${Buffer.from(JSON.stringify(payload)).toString('base64url')}`;
+        qrcode.generate(link, { small: true });
+        console.log(`\n用手机 App 扫描上面的二维码配对（5 分钟内有效）`);
+        const rl = createInterface({ input: stdin, output: stdout });
+        host.gw.on('pairing', async (ch: any) => {
+          console.log(`\n📱 设备「${ch.deviceName}」请求配对。`);
+          console.log(`   请核对手机上显示的代码：\x1b[1m${ch.sas}\x1b[0m`);
+          const ans = (await rl.question('   一致吗？(y/N) ')).trim().toLowerCase();
+          ch.confirmPairing(ans === 'y' || ans === 'yes');
+          console.log(ans.startsWith('y') ? '✅ 已配对' : '❌ 已拒绝');
+        });
+      } catch (e: any) {
+        console.warn('[pair] 二维码生成失败：', e?.message);
+      }
       const stop = () => { host.gw.stop(); host.bridge.rpc.stop(); process.exit(0); };
       process.on('SIGINT', stop);
       process.on('SIGTERM', stop);
