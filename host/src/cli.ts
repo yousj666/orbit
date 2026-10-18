@@ -31,6 +31,8 @@ async function main() {
       startControl(host);
       // Inline pairing QR: the control socket is unavailable on some
       // Windows setups, so show the pairing code right here too.
+      // Terminal ASCII QR is hard to scan, so also write a proper QR
+      // web page the user can open in a browser.
       try {
         const { token, exp } = host.id.newPairToken();
         const payload = {
@@ -40,6 +42,16 @@ async function main() {
         const link = `opa://pair?d=${Buffer.from(JSON.stringify(payload)).toString('base64url')}`;
         qrcode.generate(link, { small: true });
         console.log(`\n用手机 App 扫描上面的二维码配对（5 分钟内有效）`);
+        // Write a scannable QR web page (terminal QR is often unscannable).
+        try {
+          const qrLib = readFileSync(join(__dirname, '..', 'assets', 'qrcode.min.js'), 'utf8');
+          const html = `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Orbit 配对</title><style>body{font-family:system-ui;background:#F7F6F4;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0}#qr{background:#fff;padding:24px;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.08)}p{color:#666;max-width:320px;text-align:center}</style></head><body><h2>用 Orbit App 扫码配对</h2><div id="qr"></div><p>5 分钟内有效。电脑和手机需在同一 WiFi。</p><script>${qrLib}</script><script>var qr=qrcode(0,'M');qr.addData(${JSON.stringify(link)});qr.make();document.getElementById('qr').innerHTML=qr.createSvgTag({scalable:true});</script></body></html>`;
+          const htmlPath = join(homedir(), '.opa', 'pair.html');
+          writeFileSync(htmlPath, html);
+          console.log(`浏览器打开此文件扫码（二维码更清晰）：\n${htmlPath}`);
+        } catch (e: any) {
+          console.warn('[pair] 网页二维码生成失败：', e?.message);
+        }
         const rl = createInterface({ input: stdin, output: stdout });
         host.gw.on('pairing', async (ch: any) => {
           console.log(`\n📱 设备「${ch.deviceName}」请求配对。`);
