@@ -72,7 +72,12 @@ export function startControl(host: Host) {
     sock.on('close', () => clients.delete(sock));
     sock.on('error', () => clients.delete(sock));
   });
-  srv.listen(CONTROL_SOCK, () => chmodSync(CONTROL_SOCK, 0o600));
+  // The control socket is only for local CLI helpers; a failure here
+  // (e.g. Windows AF_UNIX restrictions) must not take down the host.
+  srv.on('error', (e: any) => {
+    console.warn(`[control] socket unavailable (${e?.message}), local CLI disabled`);
+  });
+  srv.listen(CONTROL_SOCK, () => { try { chmodSync(CONTROL_SOCK, 0o600); } catch {} });
   return srv;
 }
 
